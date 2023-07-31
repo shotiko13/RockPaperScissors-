@@ -1,29 +1,29 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
+using Spectre.Console;
 
+namespace ConsoleApp1;
 
 public class CommandLineHandler
 {
-    private string[] args;
+    private string[] _args;
 
     public CommandLineHandler(string[] args)
     {
-        this.args = args;
+        this._args = args;
     }
 
-    public List<string> ParseArgs()
+    public List<string>? ParseArgs()
     {
         List<string> parsedArguments = new List<string>();
 
-        if (this.args.Length % 2 == 0 || this.args.Length < 3)
+        if (this._args.Length % 2 == 0 || this._args.Length < 3)
         {
             Console.WriteLine("Error: There must be an odd number of arguments, and at least 3 arguments.");
             return null;
         }
 
-        foreach (var arg in this.args)
+        foreach (var arg in this._args)
         {
             if (parsedArguments.Contains(arg))
             {
@@ -38,79 +38,85 @@ public class CommandLineHandler
     }
 }
 
-public class KeyAndHMAC
+public class KeyAndHmac
 {
-    private string key;
-    private string computerMove;
+    private string? _key;
+    private string _computerMove;
 
-    public KeyAndHMAC(string computerMove)
+    [Obsolete("Obsolete")]
+    public KeyAndHmac(string computerMove)
     {
-        this.computerMove = computerMove;
+        this._computerMove = computerMove;
         GenerateKey();
     }
 
+    [Obsolete("Obsolete")]
     private void GenerateKey()
     {
         RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
         byte[] byteKey = new byte[32];
         rng.GetBytes(byteKey);
-        this.key = Convert.ToBase64String(byteKey);
+        this._key = Convert.ToBase64String(byteKey);
     }
 
-    public string GenerateHMAC()
+    public string? GenerateHmac()
     {
-        using (HMACSHA256 hmac = new HMACSHA256(Encoding.UTF8.GetBytes(this.key)))
-        {
-            byte[] hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(this.computerMove));
-            return BitConverter.ToString(hash).Replace("-", "").ToLower();
-        }
+        var chars = this._key;
+        if (chars != null)
+            using (HMACSHA256 hmac = new HMACSHA256(Encoding.UTF8.GetBytes(chars)))
+            {
+                byte[] hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(this._computerMove));
+                return BitConverter.ToString(hash).Replace("-", "").ToLower();
+            }
+
+        return null;
     }
 
-    public string GetKey()
+    public string? GetKey()
     {
-        return this.key;
+        return this._key;
     }
 }
 
 
 public class GameLogic
 {
-    private List<string> moves;
-    private Dictionary<string, LinkedListNode<string>> moveNodes;
-    private LinkedList<string> movesList;
-    private string computerMove;
+    private List<string> _moves;
+    private Dictionary<string, LinkedListNode<string>> _moveNodes;
+    private LinkedList<string> _movesList;
+    private string? _computerMove; 
 
     public GameLogic(List<string> moves)
     {
-        this.moves = moves;
-        this.moveNodes = new Dictionary<string, LinkedListNode<string>>();
-        this.movesList = new LinkedList<string>();
+        this._moves = moves;
+        this._moveNodes = new Dictionary<string, LinkedListNode<string>>();
+        this._movesList = new LinkedList<string>();
 
-        foreach (string move in this.moves)
+        foreach (string move in this._moves)
         {
             LinkedListNode<string> node = new LinkedListNode<string>(move);
-            this.movesList.AddLast(node);
-            this.moveNodes[move] = node;
+            this._movesList.AddLast(node);
+            this._moveNodes[move] = node;
         }
     }
 
     public string ComputerMove()
     {
         Random rnd = new Random();
-        int moveIndex = rnd.Next(this.moves.Count);
-        this.computerMove = this.moves[moveIndex];
+        int moveIndex = rnd.Next(this._moves.Count);
+        this._computerMove = this._moves[moveIndex];
 
-        return this.computerMove;
+        return this._computerMove;
     }
 
-    public string DecideWinner(string userMove)
+    public string DecideWinner(string userMove, string computerMove)
     {
-        LinkedListNode<string> computerMoveNode = this.moveNodes[this.computerMove];
-        LinkedListNode<string> userMoveNode = this.moveNodes[userMove];
+        LinkedListNode<string> computerMoveNode = this._moveNodes[computerMove];
+        LinkedListNode<string> userMoveNode = this._moveNodes[userMove];
 
-        for (int i = 0; i < this.movesList.Count / 2; i++)
+        for (int i = 0; i < this._movesList.Count / 2; i++)
         {
-            userMoveNode = userMoveNode.Next ?? this.movesList.First;
+            userMoveNode = userMoveNode?.Next ?? this._movesList.First!;
 
             if (userMoveNode == computerMoveNode)
             {
@@ -118,7 +124,7 @@ public class GameLogic
             }
         }
 
-        if (userMove == this.computerMove)
+        if (userMove == computerMove)
         {
             return "It's a Draw";
         }
@@ -128,64 +134,61 @@ public class GameLogic
         }
     }
 }
-
 public class HelpTable
 {
-    private List<string> moves;
-    private int halfSize;
+    private List<string> _moves;
+    private int _halfSize;
 
     public HelpTable(List<string> moves)
     {
-        this.moves = moves;
-        this.halfSize = moves.Count / 2;
+        this._moves = moves;
+        this._halfSize = moves.Count / 2;
     }
 
-    public string GenerateTable()
+    public void RenderTable()
     {
-        StringBuilder table = new StringBuilder();
-        int moveCount = this.moves.Count;
+        var table = new Table();
 
-        table.Append("v PC\\User > | ");
-        foreach (var move in moves)
+        table.AddColumn("v PC\\User >");
+        foreach (var move in _moves)
         {
-            table.Append(move + " | ");
+            table.AddColumn(move);
         }
-        table.AppendLine();
-
-        
-        for (int i = 0; i < moveCount; i++)
+            
+        for (int i = 0; i < _moves.Count; i++)
         {
-            table.Append(this.moves[i] + " | ");
-
-            for (int j = 0; j < moveCount; j++)
+            var row = new List<string>();
+            row.Add(_moves[i]);
+            for (int j = 0; j < _moves.Count; j++)
             {
                 if (i == j)
                 {
-                    table.Append("Draw | ");
+                    row.Add("Draw");
                 }
-                else if ((i > j && i - j <= halfSize) || (j > i && j - i > halfSize))
+                else if ((i > j && i - j <= _halfSize) || (j > i && j - i > _halfSize))
                 {
-                    table.Append("Win | ");
+                    row.Add("Win");
                 }
                 else
                 {
-                    table.Append("Lose | ");
+                    row.Add("Lose");
                 }
             }
-
-            table.AppendLine();
+            table.AddRow(row.ToArray());
         }
 
-        return table.ToString();
+        AnsiConsole.Write(table);
     }
 }
 
+
 public class Program
 {
+    [Obsolete("Obsolete")]
     static void Main(string[] args)
     {
         var commandHelper = new CommandLineHandler(args);
-        List<string> moves = commandHelper.ParseArgs();
+        List<string> moves = commandHelper.ParseArgs()!;
 
         if (moves == null)
         {
@@ -199,8 +202,8 @@ public class Program
         while (true)
         {
             string computerMove = game.ComputerMove();
-            var keyAndHMAC = new KeyAndHMAC(game.ComputerMove());
-            Console.WriteLine("HMAC: " + keyAndHMAC.GenerateHMAC());
+            var keyAndHmac = new KeyAndHmac(computerMove);
+            Console.WriteLine("HMAC: " + keyAndHmac.GenerateHmac());
             
             Console.WriteLine("Available Moves:");
             for (int i = 0; i < moves.Count; i++)
@@ -210,7 +213,7 @@ public class Program
             Console.WriteLine("0 - Exit");
             Console.WriteLine("? - Help");
 
-            string cmd = Console.ReadLine();
+            string? cmd = Console.ReadLine();
 
             if (cmd == "0")
             {
@@ -219,24 +222,27 @@ public class Program
             }
             else if (cmd == "?")
             {
-                Console.WriteLine(table.GenerateTable());
+                table.RenderTable();
             }
             else
             {
-                int moveIndx = int.Parse(cmd) - 1;
+                if (cmd != null)
+                {
+                    int moveIndx = int.Parse(cmd) - 1;
 
-                if (moveIndx >= 0 && moveIndx < moves.Count)
-                {
-                    string result = game.DecideWinner(moves[moveIndx]);
-                    Console.WriteLine(result);
-                }
-                else
-                {
-                    Console.WriteLine("Invalid move. Please try again.");
+                    if (moveIndx >= 0 && moveIndx < moves.Count)
+                    {
+                        string result = game.DecideWinner(moves[moveIndx], computerMove);
+                        Console.WriteLine(result);
+                    }
+                    else
+                    {
+                        Console.WriteLine("Invalid move. Please try again.");
+                    }
                 }
             }
             
-            Console.WriteLine("Key: " + keyAndHMAC.GetKey());
+            Console.WriteLine("Key: " + keyAndHmac.GetKey());
         }
 
     }
